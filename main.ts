@@ -306,10 +306,23 @@ function forecastCase(c: TrophyCase): Array<{ id: number; q: number[] }> {
       };
     }
     const centre = toLogit(fc.medianPct);
+    // Near the top, the rate can plausibly return to (near) 100% by the
+    // target — a trophy every tracked player had on launch night may be
+    // back there a week in — and the logit distance to the cap is several
+    // units, so a symmetric spread stops the upper quantiles far short of
+    // it. For a near-saturated trophy, let the upper quantiles reach the
+    // cap instead; the lower quantiles keep the fitted spread.
+    const upperSpread =
+      fc.medianPct >= 85
+        ? Math.max(fc.spread, (toLogit(TOP_RATE) - centre) / 1.645)
+        : fc.spread;
     const qs: number[] = [];
     let prev = -Infinity;
-    for (const z of Z_SCORES) {
-      const v = round4(clampPct(fromLogit(centre + z * fc.spread)));
+    for (let j = 0; j < Z_SCORES.length; j++) {
+      const z = Z_SCORES[j];
+      const v = round4(
+        clampPct(fromLogit(centre + z * (z > 0 ? upperSpread : fc.spread))),
+      );
       // Rounding must never break the non-decreasing order.
       const ordered = Math.max(v, prev);
       qs.push(ordered);
